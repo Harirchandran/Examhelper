@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Syllabus Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The application is a self-contained, single-page dashboard using the browser's Local Storage for data persistence. A top navigation bar allows users to switch between subjects. The main content area shows progress charts and checklists. All data is saved locally, making the app portable and removing any backend dependencies. -->
+    <!-- Visualization & Content Choices: The core UI remains an interactive checklist. Progress is visualized with Chart.js donut charts and HTML/CSS progress bars. AI help buttons now generate a search query and open a new tab in Perplexity AI for explanations and study plans. This simplifies the app by removing the need for direct API calls and modals. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8;
+            color: #4A4A4A;
+        }
+        .nav-button {
+            transition: all 0.3s ease;
+        }
+        .nav-button.active {
+            background-color: #A59480;
+            color: #FFFFFF;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .progress-bar-bg {
+            background-color: #EAE5E0;
+        }
+        .progress-bar-fill {
+            background-color: #A59480;
+            transition: width 0.5s ease-in-out;
+        }
+        .custom-checkbox:checked {
+            background-color: #A59480;
+            border-color: #A59480;
+        }
+        .custom-checkbox:checked::after {
+            content: '✔';
+            color: white;
+            display: block;
+            text-align: center;
+            line-height: 1.25rem;
+            font-size: 0.8rem;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 250px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 250px;
+            max-height: 250px;
+        }
+        .topic-item {
+            transition: color 0.3s ease;
+        }
+        .topic-item.completed label {
+            text-decoration: line-through;
+            color: #9CA3AF;
+        }
+        .ai-button {
+            background-color: #F3F4F6;
+            color: #6B7280;
+            transition: all 0.2s ease;
+        }
+        .ai-button:hover {
+            background-color: #E5E7EB;
+            color: #4B5563;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-5xl">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Syllabus Progress Tracker</h1>
+            <p class="text-gray-500 mt-2">Your progress is saved automatically to this browser.</p>
+        </header>
+
+        <nav id="subject-nav" class="flex flex-wrap justify-center gap-2 sm:gap-4 mb-8">
+        </nav>
+
+        <main id="subjects-container">
+        </main>
+
+    </div>
+
+    <script>
+        const syllabusData = {
+            "algo": {
+                id: "algo",
+                name: "Algorithm Analysis and Design",
+                modules: [
+                    { name: "MODULE I: Algorithm Analysis & Recurrence Equations", topics: ["Time-Space Tradeoff", "Asymptotic Notations", "Divide and Conquer Method", "Maximum Subarray Problem", "Strassen’s Algorithm", "Substitution Method", "Recursion Tree Method", "Master Method"] },
+                    { name: "MODULE II: Sorting & Order Statistics", topics: ["Heap Sort", "Priority Queues", "Quick Sort", "Insertion Sort", "Sorting in Linear Time", "Counting Sort", "Radix Sort", "Bucket Sort", "Medians and Order Statistics"] },
+                    { name: "MODULE III: Data Structures", topics: ["Hash Tables", "Binary Search Trees", "Red-Black Trees", "B-Trees", "Fibonacci Heaps"] },
+                    { name: "MODULE IV: Graph Algorithms", topics: ["BFS", "DFS", "Topological Sort", "Strongly Connected Components", "Kruskal’s Algorithm", "Prim’s Algorithm", "Bellman-Ford Algorithm", "Dijkstra’s Algorithm", "Floyd-Warshall Algorithm"] },
+                    { name: "MODULE V: Advanced Topics", topics: ["Ford-Fulkerson Method", "Maximum Bipartite Matching", "Push-relabel Algorithms", "Greedy Algorithms", "Knapsack Problem", "Backtracking", "8-Queens Problem"] },
+                    { name: "MODULE VI: String Matching & Dynamic Programming", topics: ["Naïve String Matching", "Rabin-Karp Algorithm", "Knuth-Morris-Pratt Algorithm", "Dynamic Programming", "Rod Cutting", "Matrix Chain Multiplication", "Longest Common Subsequence"] }
+                ]
+            },
+            "ml": {
+                id: "ml",
+                name: "Machine Learning",
+                modules: [
+                    { name: "MODULE I: Introduction to Machine Learning", topics: ["Why Machine Learning", "Problems ML Can Solve", "ML Applications", "Uses and Abuses of ML", "How Machines Learn", "Types of ML Algorithms"] },
+                    { name: "MODULE II: Supervised Learning", topics: ["Classification and Regression", "Generalization, Overfitting, Underfitting", "k-Nearest Neighbor", "Linear Models", "Naive Bayes Classifiers", "Decision Trees", "Random Forest", "C5.0 Algorithm"] },
+                    { name: "MODULE III: Classification Rules & SVM", topics: ["Separate and Conquer", "The 1R Algorithm", "The RIPPER Algorithm", "Support Vector Machines", "Kernel Functions", "Multi-class SVM"] },
+                    { name: "MODULE IV: Unsupervised Learning & Pre-processing", topics: ["Types of Unsupervised Learning", "Challenges in Unsupervised Learning", "Preprocessing and Scaling", "Dimensionality Reduction", "PCA", "NMF", "k-Means Clustering", "Agglomerative Clustering", "DBSCAN"] },
+                    { name: "MODULE V: Reinforcement Learning", topics: ["Basic Architecture", "Elements of RL", "Implementing RL", "The Bellman Equation", "Types of RL", "RL Algorithms", "Markov Decision Process", "Q-Learning"] },
+                    { name: "MODULE VI: Deep Learning", topics: ["How Deep Learning Works", "Deep Learning Methods", "Deep Learning Neural Network", "Benefits", "Examples"] }
+                ]
+            },
+            "dbms": {
+                id: "dbms",
+                name: "Database Management Systems",
+                modules: [
+                    { name: "MODULE I: Introduction to DBMS", topics: ["File System Limitations", "Database Approach", "Schema & Instance", "Logical DBMS Architecture", "Three Level Architecture", "Data Independence", "Physical DBMS Architecture", "DBMS Components", "DBA & Users", "Data Models"] },
+                    { name: "MODULE II: Relational Model & ER Model", topics: ["Relational Model Concepts", "Keys", "Relational Constraints", "Relational Algebra", "Entity Relationship (ER) Model", "Conversion of E-R to Relational"] },
+                    { name: "MODULE III: Database Integrity & Normalization", topics: ["Relational Integrity", "Functional Dependency", "Normalization (1NF-5NF, BCNF)", "Decomposition Properties", "Rules of Normalization"] },
+                    { name: "MODULE IV: SQL & Transaction Management", topics: ["SQL (DDL, DML, DCL)", "Database Objects", "Advanced SQL", "Storage and File Structure", "Transactions & ACID", "Concurrency Control", "Locking & 2PL", "Deadlock", "Recovery"] },
+                    { name: "MODULE V: Enhanced Database models", topics: ["Object Oriented Database", "Complex Data Types", "O-O vs Relational"] },
+                    { name: "MODULE VI: NoSQL Databases", topics: ["Introduction to NoSQL", "Key-value DB (Redis)", "Document DB (MongoDB)", "Column-Family DB (Cassandra)", "Graph DB (ArangoDB)"] }
+                ]
+            }
+        };
+
+        let state = {};
+        const charts = {};
+        const LOCAL_STORAGE_KEY = 'syllabusTrackerState';
+
+        function getInitialState() {
+            const initialState = {};
+            for (const subjectKey in syllabusData) {
+                initialState[subjectKey] = {
+                    totalTopics: 0,
+                    completedTopics: 0,
+                    modules: []
+                };
+                syllabusData[subjectKey].modules.forEach((module, moduleIndex) => {
+                    const topicStates = module.topics.map((_, topicIndex) => ({ id: `${subjectKey}-${moduleIndex}-${topicIndex}`, completed: false }));
+                    initialState[subjectKey].modules.push({
+                        totalTopics: module.topics.length,
+                        completedTopics: 0,
+                        topics: topicStates
+                    });
+                    initialState[subjectKey].totalTopics += module.topics.length;
+                });
+            }
+            return initialState;
+        }
+
+        function saveStateToLocalStorage() {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
+        }
+
+        function loadStateFromLocalStorage() {
+            const savedState = localStorage.getItem(LOCAL_STORAGE_KEY);
+            return savedState ? JSON.parse(savedState) : null;
+        }
+
+        function renderSubjects() {
+            const navContainer = document.getElementById('subject-nav');
+            const subjectsContainer = document.getElementById('subjects-container');
+            navContainer.innerHTML = '';
+            subjectsContainer.innerHTML = '';
+
+            Object.values(syllabusData).forEach((subject, index) => {
+                const navButton = document.createElement('button');
+                navButton.textContent = subject.name;
+                navButton.className = `nav-button py-2 px-4 rounded-lg font-semibold text-sm sm:text-base ${index === 0 ? 'active' : ''}`;
+                navButton.dataset.subject = subject.id;
+                navContainer.appendChild(navButton);
+
+                const subjectDiv = document.createElement('div');
+                subjectDiv.id = `subject-${subject.id}`;
+                subjectDiv.className = `space-y-8 ${index > 0 ? 'hidden' : ''}`;
+                
+                let subjectHtml = `
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <div class="flex flex-col md:flex-row items-center gap-6">
+                            <div class="flex-grow">
+                                <h2 class="text-2xl font-bold text-gray-800">${subject.name}</h2>
+                                <p class="text-gray-500 mt-1">Overall Progress</p>
+                                <p id="stats-${subject.id}" class="text-xl font-semibold text-gray-700 mt-4">0 / 0 topics completed</p>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="chart-${subject.id}"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                subject.modules.forEach((module, moduleIndex) => {
+                    subjectHtml += `
+                        <div class="bg-white p-6 rounded-xl shadow-md">
+                            <div class="flex justify-between items-start">
+                                <h3 class="text-xl font-bold text-gray-700 mb-4">${module.name}</h3>
+                                <button class="ai-button generate-plan-btn text-xs font-semibold py-1 px-2 rounded-md" data-subject="${subject.id}" data-module="${moduleIndex}">🔎 Plan with AI</button>
+                            </div>
+                            <div class="mt-2">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-medium text-gray-500">Module Progress</span>
+                                    <span id="progress-label-${subject.id}-${moduleIndex}" class="text-sm font-medium text-gray-600">0%</span>
+                                </div>
+                                <div class="w-full progress-bar-bg rounded-full h-2.5">
+                                    <div id="progress-bar-${subject.id}-${moduleIndex}" class="progress-bar-fill h-2.5 rounded-full" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <ul class="mt-6 space-y-4">
+                                ${module.topics.map((topic, topicIndex) => `
+                                    <li id="item-${subject.id}-${moduleIndex}-${topicIndex}" class="topic-item flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="check-${subject.id}-${moduleIndex}-${topicIndex}" data-subject="${subject.id}" data-module="${moduleIndex}" data-topic="${topicIndex}" class="custom-checkbox h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 appearance-none border-2 cursor-pointer flex-shrink-0">
+                                            <label for="check-${subject.id}-${moduleIndex}-${topicIndex}" class="ml-3 block text-md font-medium text-gray-700 cursor-pointer">${topic}</label>
+                                        </div>
+                                        <button class="ai-button explain-topic-btn text-xs font-semibold py-1 px-2 rounded-md" data-subject="${subject.id}" data-topic-name="${topic}">🔎 Explain with AI</button>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
+                });
+
+                subjectDiv.innerHTML = subjectHtml;
+                subjectsContainer.appendChild(subjectDiv);
+            });
+        }
+
+        function createCharts() {
+            for (const subjectKey in syllabusData) {
+                const ctx = document.getElementById(`chart-${subjectKey}`).getContext('2d');
+                charts[subjectKey] = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Completed', 'Remaining'],
+                        datasets: [{
+                            data: [0, 1],
+                            backgroundColor: ['#A59480', '#EAE5E0'],
+                            borderColor: ['#FFFFFF'],
+                            borderWidth: 2,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        plugins: { legend: { display: false }, tooltip: { enabled: false } }
+                    }
+                });
+            }
+        }
+
+        function updateUIFromState() {
+            if (!state || Object.keys(state).length === 0) return;
+            for (const subjectKey in state) {
+                const subjectState = state[subjectKey];
+                document.getElementById(`stats-${subjectKey}`).textContent = `${subjectState.completedTopics} / ${subjectState.totalTopics} topics completed`;
+                
+                const chart = charts[subjectKey];
+                chart.data.datasets[0].data = [subjectState.completedTopics, subjectState.totalTopics - subjectState.completedTopics];
+                chart.update();
+
+                subjectState.modules.forEach((moduleState, moduleIndex) => {
+                    const modulePercentage = (moduleState.totalTopics > 0) ? (moduleState.completedTopics / moduleState.totalTopics) * 100 : 0;
+                    document.getElementById(`progress-bar-${subjectKey}-${moduleIndex}`).style.width = `${modulePercentage}%`;
+                    document.getElementById(`progress-label-${subjectKey}-${moduleIndex}`).textContent = `${Math.round(modulePercentage)}%`;
+                    
+                    moduleState.topics.forEach((topicState, topicIndex) => {
+                        const checkbox = document.getElementById(`check-${subjectKey}-${moduleIndex}-${topicIndex}`);
+                        const listItem = document.getElementById(`item-${subjectKey}-${moduleIndex}-${topicIndex}`);
+                        checkbox.checked = topicState.completed;
+                        listItem.classList.toggle('completed', topicState.completed);
+                    });
+                });
+            }
+        }
+        
+        function handleCheckboxChange(e) {
+            if (e.target.type === 'checkbox') {
+                const { subject, module, topic } = e.target.dataset;
+                const isChecked = e.target.checked;
+                
+                const topicState = state[subject].modules[module].topics[topic];
+                topicState.completed = isChecked;
+
+                state[subject].modules[module].completedTopics = state[subject].modules[module].topics.filter(t => t.completed).length;
+                state[subject].completedTopics = state[subject].modules.reduce((acc, mod) => acc + mod.completedTopics, 0);
+                
+                updateUIFromState();
+                saveStateToLocalStorage();
+            }
+        }
+
+        function handleNavClick(e) {
+            if (e.target.tagName === 'BUTTON') {
+                const subjectId = e.target.dataset.subject;
+                document.querySelectorAll('#subject-nav button').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                document.querySelectorAll('#subjects-container > div').forEach(div => div.classList.add('hidden'));
+                document.getElementById(`subject-${subjectId}`).classList.remove('hidden');
+            }
+        }
+
+        function handleExplainTopic(e) {
+            const button = e.target.closest('.explain-topic-btn');
+            if (!button) return;
+            const { subject: subjectId, topicName } = button.dataset;
+            const subjectName = syllabusData[subjectId].name;
+            const prompt = `Provide a concise and easy-to-understand explanation for a university student on the topic of '${topicName}' within the subject of '${subjectName}'.`;
+            const url = `https://www.perplexity.ai/search?q=${encodeURIComponent(prompt)}`;
+            window.open(url, '_blank');
+        }
+
+        function handleGeneratePlan(e) {
+            const button = e.target.closest('.generate-plan-btn');
+            if (!button) return;
+            const { subject: subjectId, module: moduleIndex } = button.dataset;
+            const { name: subjectName, modules } = syllabusData[subjectId];
+            const { name: moduleName, topics } = modules[parseInt(moduleIndex)];
+            const topicList = topics.join(', ');
+            const prompt = `As a study assistant, create a study plan for the module '${moduleName}' in '${subjectName}'. Topics: ${topicList}. Suggest a logical order and one key focus point for each topic.`;
+            const url = `https://www.perplexity.ai/search?q=${encodeURIComponent(prompt)}`;
+            window.open(url, '_blank');
+        }
+
+        function initializeApp() {
+            state = loadStateFromLocalStorage();
+            if (!state) {
+                state = getInitialState();
+                saveStateToLocalStorage();
+            }
+            
+            renderSubjects();
+            createCharts();
+            updateUIFromState();
+
+            const subjectsContainer = document.getElementById('subjects-container');
+            subjectsContainer.addEventListener('change', handleCheckboxChange);
+            subjectsContainer.addEventListener('click', (e) => {
+                handleExplainTopic(e);
+                handleGeneratePlan(e);
+            });
+            document.getElementById('subject-nav').addEventListener('click', handleNavClick);
+        }
+
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>
